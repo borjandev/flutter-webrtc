@@ -40,7 +40,6 @@ NSArray<RTCDesktopSource*>* _captureSources;
   }
 
   [screenCapturer stopCapture];
-  NSLog(@"stop %@ capture preemptively", useBroadcastExtension ? @"broadcast" : @"replykit");
 
   [screenCapturer startCapture];
   NSLog(@"start %@ capture", useBroadcastExtension ? @"broadcast" : @"replykit");

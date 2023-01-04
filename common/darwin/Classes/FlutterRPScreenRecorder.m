@@ -46,10 +46,14 @@
 
 - (void)stopCapture {
   if (@available(iOS 11.0, *)) {
-    [screenRecorder stopCaptureWithHandler:^(NSError* _Nullable error) {
+    if (screenRecorder.recording == true) {
+      [screenRecorder stopCaptureWithHandler:^(NSError* _Nullable error) {
       if (error != nil)
         NSLog(@"!!! stopCaptureWithHandler/completionHandler %@ !!!", error);
-    }];
+      }];
+    } else {
+       NSLog(@"!!! stopCaptureWithHandler/ replay kit screen recorder was not recording");
+    }
   } else {
     // Fallback on earlier versions
     NSLog(@"FlutterRPScreenRecorder.stopCapture: Screen recorder is not available in versions "

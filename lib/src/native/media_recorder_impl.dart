@@ -56,9 +56,6 @@ class MediaRecorderNative extends MediaRecorder {
 
   @override
   Future<dynamic> stop() async {
-    if (!_isStarted) {
-      throw "Media recorder not started!";
-    }
     return await WebRTC.invokeMethod(
       'stopRecordToFile', {'recorderId': _recorderId});
   }

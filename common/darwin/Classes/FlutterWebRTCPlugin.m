@@ -15,6 +15,7 @@
 #pragma clang diagnostic ignored "-Wprotocol"
 
 @implementation FlutterWebRTCPlugin {
+RPScreenRecorder* screenRecorder;
 #pragma clang diagnostic pop
   FlutterMethodChannel* _methodChannel;
   FlutterEventSink _eventSink;
@@ -1171,6 +1172,16 @@
             result(nil);
         }
     } else if ([@"stopRecordToFile" isEqualToString:call.method]) {
+        if (screenRecorder == NULL) {
+          screenRecorder = [RPScreenRecorder sharedRecorder];
+        }
+        
+        if (screenRecorder.recording == true) {
+          [screenRecorder stopCaptureWithHandler:^(NSError* _Nullable error) {
+          if (error != nil)
+            NSLog(@"!!! stopCaptureWithHandler/completionHandler %@ !!!", error);
+          }];
+        }
         NSDictionary* argsMap = call.arguments;
         NSNumber* recorderId = argsMap[@"recorderId"];
         FlutterRTCMediaRecorder* recorder = self.recorders[recorderId];
