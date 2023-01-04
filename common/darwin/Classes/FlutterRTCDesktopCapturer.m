@@ -38,9 +38,7 @@ NSArray<RTCDesktopSource*>* _captureSources;
   } else {
     screenCapturer = [[FlutterRPScreenRecorder alloc] initWithDelegate:videoSource];
   }
-
-  [screenCapturer stopCapture];
-
+  
   [screenCapturer startCapture];
   NSLog(@"start %@ capture", useBroadcastExtension ? @"broadcast" : @"replykit");
 
