@@ -5,6 +5,8 @@
 @implementation AudioUtils
 
 + (void)ensureAudioSessionWithRecording:(BOOL)recording {
+  // Disable flutter-web rtc audio session management
+  return;
   RTCAudioSession* session = [RTCAudioSession sharedInstance];
   // we also need to set default WebRTC audio configuration, since it may be activated after
   // this method is called
@@ -58,6 +60,8 @@
 }
 
 + (void)setSpeakerphoneOn:(BOOL)enable {
+  // Disable flutter-web rtc audio session management
+  return;
   RTCAudioSession* session = [RTCAudioSession sharedInstance];
   RTCAudioSessionConfiguration* config = [RTCAudioSessionConfiguration webRTCConfiguration];
   [session lockForConfiguration];
@@ -105,6 +109,8 @@
 }
 
 + (void)deactiveRtcAudioSession {
+  // Disable flutter-web rtc audio session management
+  return;
   NSError* error = nil;
   [[AVAudioSession sharedInstance] setActive:NO
                                  withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation

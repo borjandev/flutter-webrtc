@@ -4,6 +4,8 @@
 #import <FlutterMacOS/FlutterMacOS.h>
 #endif
 #import <WebRTC/WebRTC.h>
+#import <ReplayKit/ReplayKit.h>
+#import <FlutterRTCAudioSink.h>
 
 @import Foundation;
 @import AVFoundation;
@@ -25,3 +27,50 @@
 - (void) stop:(_Nonnull FlutterResult) result;
 
 @end
+
+
+@interface InternalAudioCapture : NSObject
+
+@property (nonatomic, strong) AVAudioEngine * _Nonnull audioEngine;
+@property (nonatomic, strong) AVAssetWriter * _Nonnull assetWriter;
+@property (nonatomic, strong) AVAudioFormat * _Nullable audioFormat;
+@property (nonatomic, strong) AVAssetWriterInput * _Nonnull audioInput;
+
+- (instancetype _Nonnull )initWithAssetWriter:(AVAssetWriter *_Nonnull)assetWriter;
+- (void)startRecording;
+- (void)stopRecording;
+
+@end
+
+
+@interface AppRecorder : NSObject
+
+@property (nonatomic, strong) AVAssetWriter * _Nullable appRecordingWriter;
+@property (nonatomic, strong) AVAssetWriterInput * _Nonnull appVideoInput;
+@property (nonatomic, assign) BOOL isRecordingToFile;
+@property (nonatomic, assign) BOOL shouldSkipFrame;
+@property (nonatomic, strong) AVAssetWriterInput * _Nonnull appAudioInput;
+@property (nonatomic, strong) NSURL * _Nullable appRecordingFileURL;
+@property (nonatomic, strong) RPScreenRecorder * _Nullable replayKitRecorder;
+@property (nonatomic, strong) InternalAudioCapture * _Nullable internalAudioCapture;
+@property (nonatomic, strong) FlutterRTCAudioSink * _Nullable audioSink;
+
+
+- (instancetype _Nonnull )init;
+- (void)startWithFileName:(NSString *_Nonnull)fileName recordingHandler:(void (^_Nonnull)(NSError * _Nullable))recordingHandler;
+- (void)stopRecordingWithHandler:(void (^_Nullable)(NSError * _Nullable))handler;
+
+@end
+
+@interface AppRecorderCoordinator : NSObject
+
+@property (nonatomic, strong) AppRecorder * _Nonnull appRecorder;
+@property (nonatomic, copy) void (^ _Nullable done)(NSError * _Nullable);
+
+- (instancetype _Nonnull )init;
+- (void)startWithFileName:(NSString *_Nonnull)fileName recordingHandler:(void (^_Nonnull)(NSError * _Nullable))recordingHandler onCompletion:(void (^_Nonnull)(NSError * _Nullable))onCompletion;
+- (void)resume;
+
+@end
+
+
