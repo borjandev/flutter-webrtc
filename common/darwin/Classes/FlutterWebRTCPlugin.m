@@ -16,7 +16,7 @@
 
 @implementation FlutterWebRTCPlugin {
 RPScreenRecorder* screenRecorder;
-AppRecorderCoordinator *appRecorder;
+InkAppRecorder *inkAppRecorder;
 #pragma clang diagnostic pop
   FlutterMethodChannel* _methodChannel;
   FlutterEventSink _eventSink;
@@ -63,7 +63,7 @@ AppRecorderCoordinator *appRecorder;
   FlutterEventChannel* eventChannel =
       [FlutterEventChannel eventChannelWithName:@"FlutterWebRTC.Event" binaryMessenger:messenger];
   [eventChannel setStreamHandler:self];
-  appRecorder = [[AppRecorderCoordinator alloc] init];
+  inkAppRecorder = [[InkAppRecorder alloc] init];
   if (self) {
     _methodChannel = channel;
     _registry = registrar;
@@ -1151,11 +1151,11 @@ AppRecorderCoordinator *appRecorder;
         }
         result(nil);
     } else  if ([@"start" isEqualToString:call.method]){
-        appRecorder.appRecorder.isRecordingToFile = NO;
+        inkAppRecorder.appRecorder.isRecordingToFile = NO;
             if ([call.arguments isKindOfClass:[NSString class]]) {
                 NSString *fileName = (NSString *)call.arguments;
             
-                [appRecorder startWithFileName:fileName recordingHandler:^(NSError * _Nullable error) {
+                [inkAppRecorder startWithFileName:fileName recordingHandler:^(NSError * _Nullable error) {
                     result(@"Recording.. ");
                 } onCompletion:^(NSError * _Nullable error) {
                     result(@"Recording Complete.");
@@ -1171,22 +1171,22 @@ AppRecorderCoordinator *appRecorder;
         [audioSession setActive:YES error:&error];
         if(error)
             NSLog(@"Error while activating audio session: %@",error);
-        appRecorder.appRecorder.isRecordingToFile = NO;
+        inkAppRecorder.appRecorder.isRecordingToFile = NO;
         NSString *audioTrackID = (NSString *)call.arguments;
         RTCMediaStreamTrack *audioTrack = [self trackForId:audioTrackID];
         FlutterRTCAudioSink* _audioSink = [[FlutterRTCAudioSink alloc] initWithAudioTrack:(RTCAudioTrack *)audioTrack];
-        appRecorder.appRecorder.audioSink = _audioSink;
-        [appRecorder resume];
+        inkAppRecorder.appRecorder.audioSink = _audioSink;
+        [inkAppRecorder resume];
 
     } else if ([@"stop" isEqualToString:call.method]){
-        appRecorder.appRecorder.isRecordingToFile = NO;
-        appRecorder.appRecorder.shouldSkipFrame = YES;
-        [appRecorder.appRecorder stopRecordingWithHandler:^(NSError * _Nullable error) {
-            if (self->appRecorder.done) {
-                self->appRecorder.done(error);
+        inkAppRecorder.appRecorder.isRecordingToFile = NO;
+        inkAppRecorder.appRecorder.shouldSkipFrame = YES;
+        [inkAppRecorder.appRecorder stopRecordingWithHandler:^(NSError * _Nullable error) {
+            if (self->inkAppRecorder.done) {
+                self->inkAppRecorder.done(error);
             }
         }];
-        result(appRecorder.appRecorder.appRecordingFileURL.absoluteString);
+        result(inkAppRecorder.appRecorder.inkAppRecordingFileURL.absoluteString);
 
     }   else if ([@"changeRecorderTrack" isEqualToString:call.method]) {
         NSDictionary* argsMap = call.arguments;
@@ -1966,7 +1966,7 @@ AppRecorderCoordinator *appRecorder;
 
 
 
-@implementation AppRecorderCoordinator
+@implementation InkAppRecorder
 
 - (instancetype)init {
     self = [super init];
@@ -1991,14 +1991,14 @@ AppRecorderCoordinator *appRecorder;
 
 @implementation AppRecorder
 
-@synthesize appRecordingWriter;
-@synthesize appVideoInput;
+@synthesize inkAppRecordingWriter;
+@synthesize inkAppVideoInput;
 @synthesize isRecordingToFile;
 @synthesize shouldSkipFrame;
-@synthesize appAudioInput;
-@synthesize appRecordingFileURL;
+@synthesize inkAppAudioInput;
+@synthesize inkAppRecordingFileURL;
 @synthesize replayKitRecorder;
-@synthesize internalAudioCapture;
+@synthesize audioCapture;
 @synthesize audioSink;
 
 - (instancetype)init {
@@ -2012,14 +2012,14 @@ AppRecorderCoordinator *appRecorder;
 - (void)stopRecordingWithHandler:(void (^)(NSError * _Nullable))handler {
     if (@available(iOS 11.0, *)) {
         self.isRecordingToFile = NO;
-        [self.appVideoInput markAsFinished];
-        [self.appAudioInput markAsFinished];
-        [self.internalAudioCapture stopRecording];
+        [self.inkAppVideoInput markAsFinished];
+        [self.inkAppAudioInput markAsFinished];
+        [self.audioCapture stopRecording];
         [self.replayKitRecorder stopCaptureWithHandler:^(NSError * _Nullable error) {
             handler(error);
             if (!error) {
                 __block BOOL isFinishedWriting = NO;
-                [self.appRecordingWriter finishWritingWithCompletionHandler:^{
+                [self.inkAppRecordingWriter finishWritingWithCompletionHandler:^{
                     self.isRecordingToFile = NO;
                     isFinishedWriting = YES;
                 }];
@@ -2048,24 +2048,24 @@ AppRecorderCoordinator *appRecorder;
         
         
         NSString *path = [NSString stringWithFormat:@"%@/%@.mp4", dataPath, fileName];
-        self.appRecordingFileURL = [NSURL fileURLWithPath:path];
+        self.inkAppRecordingFileURL = [NSURL fileURLWithPath:path];
         
         
         if ([fileManager fileExistsAtPath:path] && [fileManager isWritableFileAtPath:path]) {
            NSLog(@"File is accessible and writable");
         }
         
-        self.appRecordingWriter = [[AVAssetWriter alloc] initWithURL:self.appRecordingFileURL fileType:AVFileTypeMPEG4 error:&error];
+        self.inkAppRecordingWriter = [[AVAssetWriter alloc] initWithURL:self.inkAppRecordingFileURL fileType:AVFileTypeMPEG4 error:&error];
         
         
         NSDictionary *recordingOutputSettings = @{AVVideoCodecKey: AVVideoCodecTypeH264,
                                                  AVVideoWidthKey: @(UIScreen.mainScreen.bounds.size.width),
                                                  AVVideoHeightKey: @(UIScreen.mainScreen.bounds.size.height)};
         
-        self.appVideoInput = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeVideo outputSettings:recordingOutputSettings];
-        self.appVideoInput.expectsMediaDataInRealTime = YES;
-        [self.appRecordingWriter addInput:self.appVideoInput];
-        self.internalAudioCapture = [[InternalAudioCapture alloc] initWithAssetWriter:self.appRecordingWriter];
+        self.inkAppVideoInput = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeVideo outputSettings:recordingOutputSettings];
+        self.inkAppVideoInput.expectsMediaDataInRealTime = YES;
+        [self.inkAppRecordingWriter addInput:self.inkAppVideoInput];
+        self.audioCapture = [[AudioCapture alloc] initWithAssetWriter:self.inkAppRecordingWriter];
      
 
         if (@available(iOS 11.0, *)) {
@@ -2074,7 +2074,7 @@ AppRecorderCoordinator *appRecorder;
                 if (self.shouldSkipFrame == NO) {
                     if (CMSampleBufferDataIsReady(sampleBuffer)) {
                         dispatch_async(dispatch_get_main_queue(), ^{
-                            if (self.appRecordingWriter.status == AVAssetWriterStatusUnknown) {
+                            if (self.inkAppRecordingWriter.status == AVAssetWriterStatusUnknown) {
                                 // Set the audio session once
                                 NSLog(@"AVAssetWriterStatus.unknown");
                                 AudioChannelLayout acl;
@@ -2090,43 +2090,43 @@ AppRecorderCoordinator *appRecorder;
                                     AVLinearPCMBitDepthKey: @16,
                                     AVLinearPCMIsNonInterleaved: @NO,
                                 };
-                                self->appAudioInput = [[AVAssetWriterInput alloc]
+                                self->inkAppAudioInput = [[AVAssetWriterInput alloc]
                                                 initWithMediaType:AVMediaTypeAudio
                                                 outputSettings:audioSettings
                                                           sourceFormatHint:self->audioSink.format];
-                                self->appAudioInput.expectsMediaDataInRealTime = true;
-                                [self.appRecordingWriter addInput:self.appAudioInput];
-                                [self.internalAudioCapture startRecording];
+                                self->inkAppAudioInput.expectsMediaDataInRealTime = true;
+                                [self.inkAppRecordingWriter addInput:self.inkAppAudioInput];
+                                [self.audioCapture startRecording];
                                 __weak typeof(self) weakSelf = self;
                                 self.audioSink.bufferCallback = ^(CMSampleBufferRef buffer){
                                     __strong typeof(self) strongSelf = weakSelf;
                                     if (strongSelf.isRecordingToFile == YES) {
-                                        if (strongSelf->appAudioInput.readyForMoreMediaData) {
-                                            ([strongSelf->appAudioInput appendSampleBuffer:buffer]);
+                                        if (strongSelf->inkAppAudioInput.readyForMoreMediaData) {
+                                            ([strongSelf->inkAppAudioInput appendSampleBuffer:buffer]);
                                         }
                                     }
                                     };
-                                if (![self.appRecordingWriter startWriting]) {
+                                if (![self.inkAppRecordingWriter startWriting]) {
                                     return;
                                 }
                                 
                             }
                         });
-                        if (self.appRecordingWriter.status == AVAssetWriterStatusFailed) {
-                            NSLog(@"Error occured, status = %@, error = %@", @(self.appRecordingWriter.status), self.appRecordingWriter.error);
+                        if (self.inkAppRecordingWriter.status == AVAssetWriterStatusFailed) {
+                            NSLog(@"Error occured, status = %@, error = %@", @(self.inkAppRecordingWriter.status), self.inkAppRecordingWriter.error);
                             return;
                         }
                         if (bufferType == RPSampleBufferTypeVideo) {
                             if (self.isRecordingToFile == NO) {
-                                if (self.appRecordingWriter.status == AVAssetWriterStatusWriting) {
-                                    [self.appRecordingWriter startSessionAtSourceTime:CMSampleBufferGetPresentationTimeStamp(sampleBuffer)];
+                                if (self.inkAppRecordingWriter.status == AVAssetWriterStatusWriting) {
+                                    [self.inkAppRecordingWriter startSessionAtSourceTime:CMSampleBufferGetPresentationTimeStamp(sampleBuffer)];
                                     self.isRecordingToFile = YES;
                                     NSLog(@"YES");
                                 }
                               
                             }
-                            if (self.appVideoInput.isReadyForMoreMediaData && self.isRecordingToFile == YES) {
-                                [self.appVideoInput appendSampleBuffer:sampleBuffer];
+                            if (self.inkAppVideoInput.isReadyForMoreMediaData && self.isRecordingToFile == YES) {
+                                [self.inkAppVideoInput appendSampleBuffer:sampleBuffer];
                             }
                         }
                     }
@@ -2141,7 +2141,7 @@ AppRecorderCoordinator *appRecorder;
 
 
 
-@implementation InternalAudioCapture
+@implementation AudioCapture
 
 - (instancetype)initWithAssetWriter:(AVAssetWriter *)assetWriter {
     self = [super init];
