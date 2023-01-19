@@ -2148,6 +2148,22 @@ InkAppRecorder *inkAppRecorder;
     if (self) {
         self.audioEngine = [[AVAudioEngine alloc] init];
         self.assetWriter = assetWriter;
+        
+        AudioChannelLayout acl;
+        bzero(&acl, sizeof(acl));
+        acl.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo;
+        NSDictionary* audioSettings = @{
+            AVFormatIDKey: [NSNumber numberWithInt: kAudioFormatLinearPCM],
+            AVNumberOfChannelsKey: @2,
+            AVSampleRateKey: @44100.0,
+            AVChannelLayoutKey: [NSData dataWithBytes:&acl length:sizeof(AudioChannelLayout)],
+            AVLinearPCMIsBigEndianKey: @NO,
+            AVLinearPCMIsFloatKey: @NO,
+            AVLinearPCMBitDepthKey: @16,
+            AVLinearPCMIsNonInterleaved: @NO,
+        };
+      self.audioInput = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeAudio outputSettings:audioSettings];
+      [self.assetWriter addInput:self.audioInput];
     }
     return self;
 }
@@ -2158,7 +2174,7 @@ InkAppRecorder *inkAppRecorder;
     
     CMSampleBufferRef sampleBuffer = nil;
     CMFormatDescriptionRef format = nil;
-    
+    CMBlockBufferRef blockBuffer = NULL;
     OSStatus status = CMAudioFormatDescriptionCreate(kCFAllocatorDefault,
                                                      &asbd,
                                                      0,
@@ -2170,13 +2186,24 @@ InkAppRecorder *inkAppRecorder;
     if (status != noErr) { return nil; }
     
     CMSampleTimingInfo timing = {
-        .duration = CMTimeMake(1, asbd.mSampleRate),
-        .presentationTimeStamp = CMClockGetTime(CMClockGetHostTimeClock()),
+        .duration = CMTimeMake(pcmBuffer.frameLength, asbd.mSampleRate),
+        .presentationTimeStamp = CMTimeMake(0, asbd.mSampleRate),
         .decodeTimeStamp = kCMTimeInvalid
     };
+    status = CMBlockBufferCreateWithMemoryBlock(NULL,
+                                                (void *)audioBufferList->mBuffers[0].mData,
+                                                audioBufferList->mBuffers[0].mDataByteSize,
+                                                kCFAllocatorNull,
+                                                NULL,
+                                                0,
+                                                audioBufferList->mBuffers[0].mDataByteSize,
+                                                false,
+                                                &blockBuffer
+                                            );
+    if (status != noErr) { NSLog(@"CMBlockBufferCreateWithMemoryBlock returned error: %d", status); return nil; }
     status = CMSampleBufferCreate(kCFAllocatorDefault,
-                                  NULL,
-                                  false,
+                                  blockBuffer,
+                                  true,
                                   NULL,
                                   NULL,
                                   format,
@@ -2187,21 +2214,6 @@ InkAppRecorder *inkAppRecorder;
                                   NULL,
                                   &sampleBuffer);
     if (status != noErr) { NSLog(@"CMSampleBufferCreate returned error: %d", status); return nil; }
-    
-    CMBlockBufferRef blockBuffer = NULL;
-    status = CMBlockBufferCreateWithMemoryBlock(NULL,
-                                                (void *)audioBufferList->mBuffers[0].mData,
-                                                audioBufferList->mBuffers[0].mDataByteSize,
-                                                kCFAllocatorNull,
-                                                NULL,
-                                                0,
-                                                audioBufferList->mBuffers[0].mDataByteSize,
-                                                false,
-                                                &blockBuffer);
-    if (status != noErr) { NSLog(@"CMBlockBufferCreateWithMemoryBlock returned error: %d", status); return nil; }
-    
-    status = CMSampleBufferSetDataBuffer(sampleBuffer, blockBuffer);
-    if (status != noErr) { NSLog(@"CMSampleBufferSetDataBuffer returned error: %d", status); return nil; }
     
     return sampleBuffer;
 }
@@ -2214,26 +2226,12 @@ InkAppRecorder *inkAppRecorder;
     self.audioFormat = [inputNode inputFormatForBus:0];
     AVAudioMixerNode *mixerNode = self.audioEngine.mainMixerNode;
     AVAudioFormat *inputFormat = [inputNode inputFormatForBus:0];
-    [self.audioEngine connect:inputNode to:mixerNode format:inputFormat];
-    AudioChannelLayout acl;
-    bzero(&acl, sizeof(acl));
-    acl.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo;
-    NSDictionary* audioSettings = @{
-        AVFormatIDKey: [NSNumber numberWithInt: kAudioFormatLinearPCM],
-        AVNumberOfChannelsKey: @2,
-        AVSampleRateKey: @44100.0,
-        AVChannelLayoutKey: [NSData dataWithBytes:&acl length:sizeof(AudioChannelLayout)],
-        AVLinearPCMIsBigEndianKey: @NO,
-        AVLinearPCMIsFloatKey: @NO,
-        AVLinearPCMBitDepthKey: @16,
-        AVLinearPCMIsNonInterleaved: @NO,
-    };
-    self.audioInput = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeAudio outputSettings:audioSettings];
-    
-    [mixerNode installTapOnBus:0 bufferSize:1024 format:inputFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
-        if(self.assetWriter.status == AVAssetWriterStatusWriting && self.audioInput.isReadyForMoreMediaData){
-            CMSampleBufferRef sampleBuffer = [self createSampleBufferWithPCMBuffer:buffer];
-            if (sampleBuffer != nil) {
+    [self.audioEngine connect:inputNode to:mixerNode format:self.audioFormat];
+    [mixerNode installTapOnBus:0 bufferSize:2048 format:inputFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+        CMSampleBufferRef sampleBuffer = [self createSampleBufferWithPCMBuffer:buffer];
+        
+        if (sampleBuffer != nil) {
+                if(self.assetWriter.status == AVAssetWriterStatusWriting && self.audioInput.isReadyForMoreMediaData){
                 [self.audioInput appendSampleBuffer:sampleBuffer];
                 CFRelease(sampleBuffer);
             }
@@ -2241,7 +2239,7 @@ InkAppRecorder *inkAppRecorder;
         }
     }];
     
-    [self.assetWriter addInput:self.audioInput];
+    [self.audioEngine prepare];
     [self.audioEngine startAndReturnError:nil];
 }
 
