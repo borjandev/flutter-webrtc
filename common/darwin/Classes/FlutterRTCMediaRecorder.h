@@ -35,6 +35,7 @@
 @property (nonatomic, strong) AVAssetWriter * _Nonnull assetWriter;
 @property (nonatomic, strong) AVAudioFormat * _Nullable audioFormat;
 @property (nonatomic, strong) AVAssetWriterInput * _Nonnull audioInput;
+@property (nonatomic, assign) BOOL isAssetWriterRecordingToFile;
 
 - (instancetype _Nonnull )initWithAssetWriter:(AVAssetWriter *_Nonnull)assetWriter;
 - (void)startRecording;
@@ -73,4 +74,5 @@
 
 @end
 
+NSError * _Nullable startAudioSessionIfNotStarted(void);
 

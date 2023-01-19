@@ -1151,6 +1151,7 @@ InkAppRecorder *inkAppRecorder;
         }
         result(nil);
     } else  if ([@"start" isEqualToString:call.method]){
+        startAudioSessionIfNotStarted();
         inkAppRecorder.appRecorder.isRecordingToFile = NO;
             if ([call.arguments isKindOfClass:[NSString class]]) {
                 NSString *fileName = (NSString *)call.arguments;
@@ -1163,14 +1164,7 @@ InkAppRecorder *inkAppRecorder;
             }
     
     } else if ([@"resume" isEqualToString:call.method]){
-        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-        NSError *error;
-        [audioSession setCategory:AVAudioSessionCategoryPlayAndRecord mode:AVAudioSessionModeVideoChat options:AVAudioSessionCategoryOptionMixWithOthers | AVAudioSessionCategoryOptionDefaultToSpeaker error:&error];
-        if(error)
-            NSLog(@"Error while setting audio session: %@",error);
-        [audioSession setActive:YES error:&error];
-        if(error)
-            NSLog(@"Error while activating audio session: %@",error);
+        startAudioSessionIfNotStarted();
         inkAppRecorder.appRecorder.isRecordingToFile = NO;
         NSString *audioTrackID = (NSString *)call.arguments;
         RTCMediaStreamTrack *audioTrack = [self trackForId:audioTrackID];
@@ -1989,6 +1983,32 @@ InkAppRecorder *inkAppRecorder;
 @end
 
 
+NSError * _Nullable startAudioSessionIfNotStarted(void) {
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+    NSError *error;
+    
+    bool isProperlyInitialised = NO;
+    if (audioSession.category == AVAudioSessionCategoryPlayAndRecord) {
+        if (audioSession.mode == AVAudioSessionModeVoiceChat) {
+            isProperlyInitialised = YES;
+        }
+    }
+    if (isProperlyInitialised == NO) {
+        NSLog(@"category:%@ mode:%@ options:%lu", audioSession.category, audioSession.mode, (unsigned long)audioSession.categoryOptions);
+        [audioSession setCategory:AVAudioSessionCategoryPlayAndRecord error:&error];
+        if(error)
+            NSLog(@"Error while setting audio category: %@",error);
+        [audioSession setMode:AVAudioSessionModeVoiceChat error:&error];
+        if(error)
+            NSLog(@"Error while setting audio mode: %@",error);
+        
+        [audioSession setActive:TRUE error: &error];
+        if(error)
+            NSLog(@"Error while activating session %@",error);
+    }
+    return error;
+}
+
 @implementation AppRecorder
 
 @synthesize inkAppRecordingWriter;
@@ -2121,6 +2141,7 @@ InkAppRecorder *inkAppRecorder;
                                 if (self.inkAppRecordingWriter.status == AVAssetWriterStatusWriting) {
                                     [self.inkAppRecordingWriter startSessionAtSourceTime:CMSampleBufferGetPresentationTimeStamp(sampleBuffer)];
                                     self.isRecordingToFile = YES;
+                                    self.audioCapture.isAssetWriterRecordingToFile = YES;
                                     NSLog(@"YES");
                                 }
                               
@@ -2148,6 +2169,7 @@ InkAppRecorder *inkAppRecorder;
     if (self) {
         self.audioEngine = [[AVAudioEngine alloc] init];
         self.assetWriter = assetWriter;
+        self.isAssetWriterRecordingToFile = NO;
         
         AudioChannelLayout acl;
         bzero(&acl, sizeof(acl));
@@ -2231,7 +2253,7 @@ InkAppRecorder *inkAppRecorder;
         CMSampleBufferRef sampleBuffer = [self createSampleBufferWithPCMBuffer:buffer];
         
         if (sampleBuffer != nil) {
-                if(self.assetWriter.status == AVAssetWriterStatusWriting && self.audioInput.isReadyForMoreMediaData){
+                if (self.assetWriter.status == AVAssetWriterStatusWriting && self.audioInput.isReadyForMoreMediaData && self.isAssetWriterRecordingToFile == YES) {
                 [self.audioInput appendSampleBuffer:sampleBuffer];
                 CFRelease(sampleBuffer);
             }
@@ -2244,6 +2266,7 @@ InkAppRecorder *inkAppRecorder;
 }
 
 - (void)stopRecording {
+    [self.audioEngine.mainMixerNode removeTapOnBus:0];
     [self.audioEngine stop];
     [self.audioInput markAsFinished];
 }
