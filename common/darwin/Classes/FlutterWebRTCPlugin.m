@@ -2196,7 +2196,7 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
     
     CMSampleBufferRef sampleBuffer = nil;
     CMFormatDescriptionRef format = nil;
-    CMBlockBufferRef blockBuffer = NULL;
+    
     OSStatus status = CMAudioFormatDescriptionCreate(kCFAllocatorDefault,
                                                      &asbd,
                                                      0,
@@ -2208,24 +2208,14 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
     if (status != noErr) { return nil; }
     
     CMSampleTimingInfo timing = {
-        .duration = CMTimeMake(pcmBuffer.frameLength, asbd.mSampleRate),
-        .presentationTimeStamp = CMTimeMake(0, asbd.mSampleRate),
+        .duration = CMTimeMake(1, asbd.mSampleRate),
+        .presentationTimeStamp = CMClockGetTime(CMClockGetHostTimeClock()),
         .decodeTimeStamp = kCMTimeInvalid
     };
-    status = CMBlockBufferCreateWithMemoryBlock(NULL,
-                                                (void *)audioBufferList->mBuffers[0].mData,
-                                                audioBufferList->mBuffers[0].mDataByteSize,
-                                                kCFAllocatorNull,
-                                                NULL,
-                                                0,
-                                                audioBufferList->mBuffers[0].mDataByteSize,
-                                                false,
-                                                &blockBuffer
-                                            );
-    if (status != noErr) { NSLog(@"CMBlockBufferCreateWithMemoryBlock returned error: %d", status); return nil; }
+
     status = CMSampleBufferCreate(kCFAllocatorDefault,
-                                  blockBuffer,
-                                  true,
+                                  NULL,
+                                  false,
                                   NULL,
                                   NULL,
                                   format,
@@ -2236,7 +2226,21 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
                                   NULL,
                                   &sampleBuffer);
     if (status != noErr) { NSLog(@"CMSampleBufferCreate returned error: %d", status); return nil; }
-    
+        CMBlockBufferRef blockBuffer = NULL;
+    status = CMBlockBufferCreateWithMemoryBlock(NULL,
+                                                (void *)audioBufferList->mBuffers[0].mData,
+                                                audioBufferList->mBuffers[0].mDataByteSize,
+                                                kCFAllocatorNull,
+                                                NULL,
+                                                0,
+                                                audioBufferList->mBuffers[0].mDataByteSize,
+                                                false,
+                                                &blockBuffer);
+    if (status != noErr) { NSLog(@"CMBlockBufferCreateWithMemoryBlock returned error: %d", status); return nil; }
+
+    status = CMSampleBufferSetDataBuffer(sampleBuffer, blockBuffer);
+    if (status != noErr) { NSLog(@"CMSampleBufferSetDataBuffer returned error: %d", status); return nil; }
+
     return sampleBuffer;
 }
 
@@ -2248,8 +2252,8 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
     self.audioFormat = [inputNode inputFormatForBus:0];
     AVAudioMixerNode *mixerNode = self.audioEngine.mainMixerNode;
     AVAudioFormat *inputFormat = [inputNode inputFormatForBus:0];
-    [self.audioEngine connect:inputNode to:mixerNode format:self.audioFormat];
-    [mixerNode installTapOnBus:0 bufferSize:2048 format:inputFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+    [self.audioEngine connect:inputNode to:mixerNode format:inputFormat];
+    [mixerNode installTapOnBus:0 bufferSize:1024 format:inputFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
         CMSampleBufferRef sampleBuffer = [self createSampleBufferWithPCMBuffer:buffer];
         
         if (sampleBuffer != nil) {
@@ -2261,7 +2265,6 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
         }
     }];
     
-    [self.audioEngine prepare];
     [self.audioEngine startAndReturnError:nil];
 }
 
