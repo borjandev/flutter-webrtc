@@ -11,6 +11,7 @@
 #import <WebRTC/WebRTC.h>
 #import "FlutterRTCAudioSink.h"
 #import <ReplayKit/ReplayKit.h>
+#import <mach/mach_time.h>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wprotocol"
 
@@ -2177,7 +2178,7 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
         NSDictionary* audioSettings = @{
             AVFormatIDKey: [NSNumber numberWithInt: kAudioFormatLinearPCM],
             AVNumberOfChannelsKey: @2,
-            AVSampleRateKey: @44100.0,
+            AVSampleRateKey: @48000.0,
             AVChannelLayoutKey: [NSData dataWithBytes:&acl length:sizeof(AudioChannelLayout)],
             AVLinearPCMIsBigEndianKey: @NO,
             AVLinearPCMIsFloatKey: @NO,
@@ -2190,81 +2191,34 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
     return self;
 }
 
-- (CMSampleBufferRef _Nullable)createSampleBufferWithPCMBuffer:(AVAudioPCMBuffer *)pcmBuffer {
-    const AudioBufferList *audioBufferList = pcmBuffer.mutableAudioBufferList;
-    AudioStreamBasicDescription asbd = *pcmBuffer.format.streamDescription;
-    
-    CMSampleBufferRef sampleBuffer = nil;
-    CMFormatDescriptionRef format = nil;
-    
-    OSStatus status = CMAudioFormatDescriptionCreate(kCFAllocatorDefault,
-                                                     &asbd,
-                                                     0,
-                                                     NULL,
-                                                     0,
-                                                     NULL,
-                                                     NULL,
-                                                     &format);
-    if (status != noErr) { return nil; }
-    
-    CMSampleTimingInfo timing = {
-        .duration = CMTimeMake(1, asbd.mSampleRate),
-        .presentationTimeStamp = CMClockGetTime(CMClockGetHostTimeClock()),
-        .decodeTimeStamp = kCMTimeInvalid
-    };
-
-    status = CMSampleBufferCreate(kCFAllocatorDefault,
-                                  NULL,
-                                  false,
-                                  NULL,
-                                  NULL,
-                                  format,
-                                  (CMItemCount)pcmBuffer.frameLength,
-                                  1,
-                                  &timing,
-                                  0,
-                                  NULL,
-                                  &sampleBuffer);
-    if (status != noErr) { NSLog(@"CMSampleBufferCreate returned error: %d", status); return nil; }
-        CMBlockBufferRef blockBuffer = NULL;
-    status = CMBlockBufferCreateWithMemoryBlock(NULL,
-                                                (void *)audioBufferList->mBuffers[0].mData,
-                                                audioBufferList->mBuffers[0].mDataByteSize,
-                                                kCFAllocatorNull,
-                                                NULL,
-                                                0,
-                                                audioBufferList->mBuffers[0].mDataByteSize,
-                                                false,
-                                                &blockBuffer);
-    if (status != noErr) { NSLog(@"CMBlockBufferCreateWithMemoryBlock returned error: %d", status); return nil; }
-
-    status = CMSampleBufferSetDataBuffer(sampleBuffer, blockBuffer);
-    if (status != noErr) { NSLog(@"CMSampleBufferSetDataBuffer returned error: %d", status); return nil; }
-
-    return sampleBuffer;
-}
-
-
-
 - (void)startRecording {
     
     AVAudioInputNode *inputNode = self.audioEngine.inputNode;
     self.audioFormat = [inputNode inputFormatForBus:0];
     AVAudioMixerNode *mixerNode = self.audioEngine.mainMixerNode;
-    AVAudioFormat *inputFormat = [inputNode inputFormatForBus:0];
-    [self.audioEngine connect:inputNode to:mixerNode format:inputFormat];
-    [mixerNode installTapOnBus:0 bufferSize:1024 format:inputFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
-        CMSampleBufferRef sampleBuffer = [self createSampleBufferWithPCMBuffer:buffer];
+    [self.audioEngine connect:inputNode to:mixerNode format:self.audioFormat];
+    [mixerNode installTapOnBus:0 bufferSize:2048 format:self.audioFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+        // Create a CMSampleBuffer from the PCM buffer
+        CMBlockBufferRef blockBuffer;
+        CMSampleBufferRef sampleBuffer;
+        size_t numSamples = buffer.frameLength;
+        // Create a block buffer from the PCM buffer's audio data
+        OSStatus status = CMBlockBufferCreateWithMemoryBlock(NULL, buffer.audioBufferList->mBuffers[0].mData, buffer.frameLength * buffer.format.streamDescription->mBytesPerFrame, kCFAllocatorDefault, NULL, 0, buffer.frameLength * buffer.format.streamDescription->mBytesPerFrame, 0, &blockBuffer);
+
+        // Create a sample buffer from the block buffer
+        status = CMSampleBufferCreate(kCFAllocatorDefault, blockBuffer, true, NULL, NULL, buffer.format.formatDescription, 1, 0, NULL, 1, &numSamples, &sampleBuffer);
+
         
         if (sampleBuffer != nil) {
-                if (self.assetWriter.status == AVAssetWriterStatusWriting && self.audioInput.isReadyForMoreMediaData && self.isAssetWriterRecordingToFile == YES) {
+            if (self.assetWriter.status == AVAssetWriterStatusWriting && self.audioInput.isReadyForMoreMediaData && self.isAssetWriterRecordingToFile == YES) {
                 [self.audioInput appendSampleBuffer:sampleBuffer];
-                CFRelease(sampleBuffer);
             }
-            
+            CFRelease(sampleBuffer);
         }
+       
     }];
     
+    [self.audioEngine prepare];
     [self.audioEngine startAndReturnError:nil];
 }
 
