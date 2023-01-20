@@ -2186,6 +2186,7 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
             AVLinearPCMIsNonInterleaved: @NO,
         };
       self.audioInput = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeAudio outputSettings:audioSettings];
+      self.audioInput.expectsMediaDataInRealTime = YES;
       [self.assetWriter addInput:self.audioInput];
     }
     return self;
@@ -2197,17 +2198,26 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
     self.audioFormat = [inputNode inputFormatForBus:0];
     AVAudioMixerNode *mixerNode = self.audioEngine.mainMixerNode;
     [self.audioEngine connect:inputNode to:mixerNode format:self.audioFormat];
-    [mixerNode installTapOnBus:0 bufferSize:2048 format:self.audioFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+    [mixerNode installTapOnBus:0 bufferSize:4096 * 2 format:self.audioFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull audioTime) {
         // Create a CMSampleBuffer from the PCM buffer
+        CMSampleTimingInfo timingInfo;
+        timingInfo.duration = CMTimeMake(buffer.frameLength, audioTime.sampleRate);
+        mach_timebase_info_data_t timeInfo;
+        mach_timebase_info(&timeInfo);
+        CMTime time = CMTimeMake(mach_absolute_time() * timeInfo.numer / timeInfo.denom, 1000000000);
+        timingInfo.presentationTimeStamp = time;
+        timingInfo.decodeTimeStamp = kCMTimeInvalid;
+        
+        
         CMBlockBufferRef blockBuffer;
         CMSampleBufferRef sampleBuffer;
         size_t numSamples = buffer.frameLength;
         // Create a block buffer from the PCM buffer's audio data
         OSStatus status = CMBlockBufferCreateWithMemoryBlock(NULL, buffer.audioBufferList->mBuffers[0].mData, buffer.frameLength * buffer.format.streamDescription->mBytesPerFrame, kCFAllocatorDefault, NULL, 0, buffer.frameLength * buffer.format.streamDescription->mBytesPerFrame, 0, &blockBuffer);
 
-        // Create a sample buffer from the block buffer
-        status = CMSampleBufferCreate(kCFAllocatorDefault, blockBuffer, true, NULL, NULL, buffer.format.formatDescription, 1, 0, NULL, 1, &numSamples, &sampleBuffer);
-
+            
+        status = CMSampleBufferCreate(kCFAllocatorDefault, blockBuffer, true, NULL, NULL, buffer.format.formatDescription, buffer.frameLength, 1, &timingInfo, 0, NULL, &sampleBuffer);
+        
         
         if (sampleBuffer != nil) {
             if (self.assetWriter.status == AVAssetWriterStatusWriting && self.audioInput.isReadyForMoreMediaData && self.isAssetWriterRecordingToFile == YES) {
