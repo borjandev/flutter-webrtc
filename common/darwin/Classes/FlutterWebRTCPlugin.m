@@ -2193,6 +2193,7 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
 - (void)startEngine {
     AVAudioInputNode *inputNode = self.audioEngine.inputNode;
     AVAudioMixerNode *mixerNode = self.audioEngine.mainMixerNode;
+    inputNode.volume = 0.075;
     [self.audioEngine connect:inputNode to:mixerNode format:[inputNode inputFormatForBus:0]];
     [self.audioEngine prepare];
     [self.audioEngine startAndReturnError:nil];
