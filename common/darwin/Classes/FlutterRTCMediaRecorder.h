@@ -29,17 +29,13 @@
 @end
 
 
-@interface AudioCapture : NSObject
+@interface CustomAudioEngine : NSObject
 
-@property (nonatomic, strong) AVAudioEngine * _Nonnull audioEngine;
-@property (nonatomic, strong) AVAssetWriter * _Nonnull assetWriter;
-@property (nonatomic, strong) AVAudioFormat * _Nullable audioFormat;
-@property (nonatomic, strong) AVAssetWriterInput * _Nonnull audioInput;
-@property (nonatomic, assign) BOOL isAssetWriterRecordingToFile;
+@property (nonatomic, strong) AVAudioEngine * _Nullable audioEngine;
 
-- (instancetype _Nonnull )initWithAssetWriter:(AVAssetWriter *_Nonnull)assetWriter;
-- (void)startRecording;
-- (void)stopRecording;
+- (instancetype _Nonnull )init;
+- (void)startEngine;
+- (void)stopEngine;
 
 @end
 
@@ -51,9 +47,10 @@
 @property (nonatomic, assign) BOOL isRecordingToFile;
 @property (nonatomic, assign) BOOL shouldSkipFrame;
 @property (nonatomic, strong) AVAssetWriterInput * _Nonnull inkAppAudioInput;
+@property (nonatomic, strong) AVAssetWriterInput * _Nonnull inkLocalAudioInput;
 @property (nonatomic, strong) NSURL * _Nullable inkAppRecordingFileURL;
 @property (nonatomic, strong) RPScreenRecorder * _Nullable replayKitRecorder;
-@property (nonatomic, strong) AudioCapture * _Nullable audioCapture;
+@property (nonatomic, strong) CustomAudioEngine * _Nullable audioCapture;
 @property (nonatomic, strong) FlutterRTCAudioSink * _Nullable audioSink;
 
 

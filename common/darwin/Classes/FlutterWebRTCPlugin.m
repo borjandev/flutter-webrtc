@@ -2017,6 +2017,7 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
 @synthesize isRecordingToFile;
 @synthesize shouldSkipFrame;
 @synthesize inkAppAudioInput;
+@synthesize inkLocalAudioInput;
 @synthesize inkAppRecordingFileURL;
 @synthesize replayKitRecorder;
 @synthesize audioCapture;
@@ -2034,8 +2035,9 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
     if (@available(iOS 11.0, *)) {
         self.isRecordingToFile = NO;
         [self.inkAppVideoInput markAsFinished];
+        [self.inkLocalAudioInput markAsFinished];
         [self.inkAppAudioInput markAsFinished];
-        [self.audioCapture stopRecording];
+        [self.audioCapture stopEngine];
         [self.replayKitRecorder stopCaptureWithHandler:^(NSError * _Nullable error) {
             handler(error);
             if (!error) {
@@ -2086,7 +2088,7 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
         self.inkAppVideoInput = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeVideo outputSettings:recordingOutputSettings];
         self.inkAppVideoInput.expectsMediaDataInRealTime = YES;
         [self.inkAppRecordingWriter addInput:self.inkAppVideoInput];
-        self.audioCapture = [[AudioCapture alloc] initWithAssetWriter:self.inkAppRecordingWriter];
+        self.audioCapture = [[CustomAudioEngine alloc] init];
      
 
         if (@available(iOS 11.0, *)) {
@@ -2117,7 +2119,17 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
                                                           sourceFormatHint:self->audioSink.format];
                                 self->inkAppAudioInput.expectsMediaDataInRealTime = true;
                                 [self.inkAppRecordingWriter addInput:self.inkAppAudioInput];
-                                [self.audioCapture startRecording];
+                                
+                                self->inkLocalAudioInput = [[AVAssetWriterInput alloc]
+                                                initWithMediaType:AVMediaTypeAudio
+                                                outputSettings:audioSettings
+                                                          sourceFormatHint:self->audioSink.format];
+                                self->inkLocalAudioInput.expectsMediaDataInRealTime = true;
+                                [self.inkAppRecordingWriter addInput:self.inkLocalAudioInput];
+                                
+                                
+                                
+                                [self.audioCapture startEngine];
                                 __weak typeof(self) weakSelf = self;
                                 self.audioSink.bufferCallback = ^(CMSampleBufferRef buffer){
                                     __strong typeof(self) strongSelf = weakSelf;
@@ -2142,13 +2154,18 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
                                 if (self.inkAppRecordingWriter.status == AVAssetWriterStatusWriting) {
                                     [self.inkAppRecordingWriter startSessionAtSourceTime:CMSampleBufferGetPresentationTimeStamp(sampleBuffer)];
                                     self.isRecordingToFile = YES;
-                                    self.audioCapture.isAssetWriterRecordingToFile = YES;
                                     NSLog(@"YES");
                                 }
                               
                             }
                             if (self.inkAppVideoInput.isReadyForMoreMediaData && self.isRecordingToFile == YES) {
                                 [self.inkAppVideoInput appendSampleBuffer:sampleBuffer];
+                            }
+                        }
+                        
+                        if (bufferType == RPSampleBufferTypeAudioApp) {
+                            if (self.inkLocalAudioInput.isReadyForMoreMediaData && self.isRecordingToFile == YES) {
+                                [self.inkLocalAudioInput appendSampleBuffer:sampleBuffer];
                             }
                         }
                     }
@@ -2163,79 +2180,26 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
 
 
 
-@implementation AudioCapture
+@implementation CustomAudioEngine
 
-- (instancetype)initWithAssetWriter:(AVAssetWriter *)assetWriter {
+- (instancetype)init {
     self = [super init];
     if (self) {
         self.audioEngine = [[AVAudioEngine alloc] init];
-        self.assetWriter = assetWriter;
-        self.isAssetWriterRecordingToFile = NO;
-        
-        AudioChannelLayout acl;
-        bzero(&acl, sizeof(acl));
-        acl.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo;
-        NSDictionary* audioSettings = @{
-            AVFormatIDKey: [NSNumber numberWithInt: kAudioFormatLinearPCM],
-            AVNumberOfChannelsKey: @2,
-            AVSampleRateKey: @48000.0,
-            AVChannelLayoutKey: [NSData dataWithBytes:&acl length:sizeof(AudioChannelLayout)],
-            AVLinearPCMIsBigEndianKey: @NO,
-            AVLinearPCMIsFloatKey: @NO,
-            AVLinearPCMBitDepthKey: @16,
-            AVLinearPCMIsNonInterleaved: @NO,
-        };
-      self.audioInput = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeAudio outputSettings:audioSettings];
-      self.audioInput.expectsMediaDataInRealTime = YES;
-      [self.assetWriter addInput:self.audioInput];
     }
     return self;
 }
 
-- (void)startRecording {
-    
+- (void)startEngine {
     AVAudioInputNode *inputNode = self.audioEngine.inputNode;
-    self.audioFormat = [inputNode inputFormatForBus:0];
     AVAudioMixerNode *mixerNode = self.audioEngine.mainMixerNode;
-    [self.audioEngine connect:inputNode to:mixerNode format:self.audioFormat];
-    [mixerNode installTapOnBus:0 bufferSize:4096 * 2 format:self.audioFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull audioTime) {
-        // Create a CMSampleBuffer from the PCM buffer
-        CMSampleTimingInfo timingInfo;
-        timingInfo.duration = CMTimeMake(buffer.frameLength, audioTime.sampleRate);
-        mach_timebase_info_data_t timeInfo;
-        mach_timebase_info(&timeInfo);
-        CMTime time = CMTimeMake(mach_absolute_time() * timeInfo.numer / timeInfo.denom, 1000000000);
-        timingInfo.presentationTimeStamp = time;
-        timingInfo.decodeTimeStamp = kCMTimeInvalid;
-        
-        
-        CMBlockBufferRef blockBuffer;
-        CMSampleBufferRef sampleBuffer;
-        size_t numSamples = buffer.frameLength;
-        // Create a block buffer from the PCM buffer's audio data
-        OSStatus status = CMBlockBufferCreateWithMemoryBlock(NULL, buffer.audioBufferList->mBuffers[0].mData, buffer.frameLength * buffer.format.streamDescription->mBytesPerFrame, kCFAllocatorDefault, NULL, 0, buffer.frameLength * buffer.format.streamDescription->mBytesPerFrame, 0, &blockBuffer);
-
-            
-        status = CMSampleBufferCreate(kCFAllocatorDefault, blockBuffer, true, NULL, NULL, buffer.format.formatDescription, buffer.frameLength, 1, &timingInfo, 0, NULL, &sampleBuffer);
-        
-        
-        if (sampleBuffer != nil) {
-            if (self.assetWriter.status == AVAssetWriterStatusWriting && self.audioInput.isReadyForMoreMediaData && self.isAssetWriterRecordingToFile == YES) {
-                [self.audioInput appendSampleBuffer:sampleBuffer];
-            }
-            CFRelease(sampleBuffer);
-        }
-       
-    }];
-    
+    [self.audioEngine connect:inputNode to:mixerNode format:[inputNode inputFormatForBus:0]];
     [self.audioEngine prepare];
     [self.audioEngine startAndReturnError:nil];
 }
 
-- (void)stopRecording {
-    [self.audioEngine.mainMixerNode removeTapOnBus:0];
+- (void)stopEngine {
     [self.audioEngine stop];
-    [self.audioInput markAsFinished];
 }
 
 @end
