@@ -18,7 +18,6 @@ class MediaRecorder extends rtc.MediaRecorder {
       path,
       videoTrack: videoTrack,
       audioChannel: audioChannel,
-      rotationDegrees: rotationDegrees,
     );
   }
 
@@ -26,14 +25,11 @@ class MediaRecorder extends rtc.MediaRecorder {
   Future stop() => _delegate.stop();
 
   @override
-  Future<void> changeVideoTrack(MediaStreamTrack videoTrack) =>
-      _delegate.changeVideoTrack(videoTrack);
-
-  @override
   void startWeb(
     MediaStream stream, {
     Function(dynamic blob, bool isLastOne)? onDataChunk,
-    String? mimeType,int timeSlice = 1000,
+    String? mimeType,
+    int timeSlice = 1000,
   }) =>
       _delegate.startWeb(
         stream,
