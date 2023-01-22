@@ -8,8 +8,10 @@
 @implementation FlutterRTCAudioSink {
     AudioSinkBridge *_bridge;
     webrtc::AudioSourceInterface* _audioSource;
-    bool _isFirstAudioSample;
 }
+
+@synthesize firstAudioSampleTime;
+@synthesize referenceSampleTime;
 
 - (instancetype) initWithAudioTrack:(RTCAudioTrack* )audio {
     self = [super init];
@@ -17,7 +19,8 @@
     _audioSource = audioSourcePtr.get();
     _bridge = new AudioSinkBridge((void*)CFBridgingRetain(self));
     _audioSource->AddSink(_bridge);
-    _isFirstAudioSample = true;
+    firstAudioSampleTime = CMTimeMake(1,1);
+    referenceSampleTime = CMTimeMake(1,1);
     return self;
 }
 
@@ -33,23 +36,30 @@ void RTCAudioSinkCallback (void *object, const void *audio_data, int bits_per_sa
     FlutterRTCAudioSink* sink = (__bridge FlutterRTCAudioSink*)(object);
     if (sink.bufferCallback) {
         if (!sink.format) {
-            // Create the audio format description
-            AudioStreamBasicDescription asbd;
-            asbd.mSampleRate = sample_rate;
-            asbd.mFormatID = kAudioFormatLinearPCM;
-            asbd.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
-            asbd.mBitsPerChannel = bits_per_sample;
-            asbd.mChannelsPerFrame = (UInt32)number_of_channels;
-            asbd.mFramesPerPacket = 1;
-            asbd.mBytesPerFrame = asbd.mBitsPerChannel * asbd.mChannelsPerFrame / 8;
-            asbd.mBytesPerPacket = asbd.mBytesPerFrame * asbd.mFramesPerPacket;
-            CMAudioFormatDescriptionRef format = NULL;
-            OSStatus status = CMAudioFormatDescriptionCreate(kCFAllocatorDefault, &asbd, 0, NULL, 0, NULL, NULL, &format);
-            if (status == noErr) {
-                sink.format = format;
+            AudioBufferList audioBufferList;
+               AudioBuffer audioBuffer;
+               audioBuffer.mData = (void*) audio_data;
+               audioBuffer.mDataByteSize = bits_per_sample / 8 * UInt32(number_of_channels) * UInt32(number_of_frames);
+               audioBuffer.mNumberChannels = UInt32(number_of_channels);
+               audioBufferList.mNumberBuffers = 1;
+               audioBufferList.mBuffers[0] = audioBuffer;
+               AudioStreamBasicDescription audioDescription;
+               audioDescription.mBytesPerFrame = bits_per_sample / 8 * UInt32(number_of_channels);
+               audioDescription.mBitsPerChannel = bits_per_sample;
+               audioDescription.mBytesPerPacket = bits_per_sample / 8 * UInt32(number_of_channels);
+               audioDescription.mChannelsPerFrame = UInt32(number_of_channels);
+               audioDescription.mFormatID = kAudioFormatLinearPCM;
+               audioDescription.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsPacked;
+               audioDescription.mFramesPerPacket = 1;
+               audioDescription.mReserved = 0;
+               audioDescription.mSampleRate = sample_rate;
+               CMAudioFormatDescriptionRef formatDesc;
+               CMAudioFormatDescriptionCreate(kCFAllocatorDefault, &audioDescription, 0, nil, 0, nil, nil, &formatDesc);
+            if (formatDesc != NULL) {
+                sink.format =formatDesc;
             } else {
                 // Handle the error
-                NSLog(@"Error creating audio format description: %d", (int)status);
+                NSLog(@"Error creating audio format description:");
                 return;
             }
         }
@@ -64,11 +74,15 @@ void RTCAudioSinkCallback (void *object, const void *audio_data, int bits_per_sa
         
         CMSampleTimingInfo timingInfo;
         timingInfo.duration = CMTimeMake(number_of_frames, sample_rate);
-        mach_timebase_info_data_t timeInfo;
-        mach_timebase_info(&timeInfo);
-        CMTime time = CMTimeMake(mach_absolute_time() * timeInfo.numer / timeInfo.denom, 1000000000);
-        timingInfo.presentationTimeStamp = time;
+        
         timingInfo.decodeTimeStamp = kCMTimeInvalid;
+        if (sink.firstAudioSampleTime.value == 1) {
+            mach_timebase_info_data_t timeInfo;
+            mach_timebase_info(&timeInfo);
+            CMTime time = CMTimeMake(mach_absolute_time() * timeInfo.numer / timeInfo.denom, 1000000000);
+            sink.firstAudioSampleTime = time;
+            timingInfo.presentationTimeStamp = time;
+        } 
         CMSampleBufferRef sampleBuffer;
         status = CMSampleBufferCreate(kCFAllocatorDefault, blockBuffer, true, NULL, NULL, sink.format, number_of_frames, 1, &timingInfo, 0, NULL, &sampleBuffer);
         if (status != noErr) {

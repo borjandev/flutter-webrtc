@@ -6,7 +6,8 @@
 
 @property (nonatomic, copy) void (^bufferCallback)(CMSampleBufferRef);
 @property (nonatomic) CMAudioFormatDescriptionRef format;
-@property (nonatomic) bool isFirstAudioSample;
+@property (nonatomic) CMTime firstAudioSampleTime;
+@property (nonatomic) CMTime referenceSampleTime;
 
 - (instancetype) initWithAudioTrack:(RTCAudioTrack*)audio;
 
