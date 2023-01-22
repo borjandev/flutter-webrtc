@@ -57,6 +57,8 @@ void RTCAudioSinkCallback (void *object, const void *audio_data, int bits_per_sa
                CMAudioFormatDescriptionCreate(kCFAllocatorDefault, &audioDescription, 0, nil, 0, nil, nil, &formatDesc);
             if (formatDesc != NULL) {
                 sink.format =formatDesc;
+                sink.firstAudioSampleTime = CMTimeMake(1,1);
+                sink.referenceSampleTime = CMTimeMake(1,1);
             } else {
                 // Handle the error
                 NSLog(@"Error creating audio format description:");
@@ -82,7 +84,9 @@ void RTCAudioSinkCallback (void *object, const void *audio_data, int bits_per_sa
             CMTime time = CMTimeMake(mach_absolute_time() * timeInfo.numer / timeInfo.denom, 1000000000);
             sink.firstAudioSampleTime = time;
             timingInfo.presentationTimeStamp = time;
-        } 
+        } else {
+            timingInfo.presentationTimeStamp = sink.firstAudioSampleTime;
+        }
         CMSampleBufferRef sampleBuffer;
         status = CMSampleBufferCreate(kCFAllocatorDefault, blockBuffer, true, NULL, NULL, sink.format, number_of_frames, 1, &timingInfo, 0, NULL, &sampleBuffer);
         if (status != noErr) {

@@ -2037,6 +2037,7 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
         [self.inkAppVideoInput markAsFinished];
         [self.inkAppAudioInput markAsFinished];
         [self.audioCapture stopRecording];
+        [self.audioSink close];
         [self.replayKitRecorder stopCaptureWithHandler:^(NSError * _Nullable error) {
             handler(error);
             if (!error) {
@@ -2120,6 +2121,8 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
                                 [self.inkAppRecordingWriter addInput:self.inkAppAudioInput];
                                 [self.audioCapture startRecording];
                                 __weak typeof(self) weakSelf = self;
+                                self.audioSink.firstAudioSampleTime = CMTimeMake(1,1);
+                                self.audioSink.referenceSampleTime = CMTimeMake(1,1);
                                 self.audioSink.bufferCallback = ^(CMSampleBufferRef buffer){
                                     __strong typeof(self) strongSelf = weakSelf;
                                     if (strongSelf.isRecordingToFile == YES) {
@@ -2221,6 +2224,7 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
 
 - (void)stopRecording {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
+        [self->_localMicrophoneAudioInput markAsFinished];
         [self.localMicrophoneCaptureSession stopRunning];
     });
 }
