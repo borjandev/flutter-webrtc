@@ -67,7 +67,7 @@ import org.webrtc.VideoCapturer;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
 import org.webrtc.audio.JavaAudioDeviceModule;
-
+import org.webrtc.audio.WebRtcAudioTrackUtils;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -328,6 +328,13 @@ class GetUserMediaImpl {
     private AudioTrack getUserAudio(ConstraintsMap constraints) {
         AudioManager audioManager = (AudioManager) applicationContext.getSystemService(Context.AUDIO_SERVICE);
         audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+        Log.i(TAG, "getUserMedia(audio): MODE_IN_COMMUNICATION");
+        WebRtcAudioTrackUtils.setBlacklistDeviceForOpenSLESUsage(true);
+        Log.i(TAG, "getUserMedia(audio): setBlacklistDeviceForOpenSLESUsage(true)");
+        WebRtcAudioTrackUtils.setWebRtcBasedAcousticEchoCanceler(true);
+        Log.i(TAG, "getUserMedia(audio): setWebRtcBasedAcousticEchoCanceler(true)");
+        WebRtcAudioTrackUtils.setWebRtcBasedNoiseSuppressor(true);
+        Log.i(TAG, "getUserMedia(audio): setWebRtcBasedNoiseSuppressor(true)");
         AudioSwitchManager.instance.start();
         MediaConstraints audioConstraints;
         if (constraints.getType("audio") == ObjectType.Boolean) {
