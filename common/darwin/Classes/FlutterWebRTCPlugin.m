@@ -13,6 +13,7 @@
 #import <ReplayKit/ReplayKit.h>
 #import <mach/mach_time.h>
 #import <Accelerate/Accelerate.h>
+#import <CoreMedia/CoreMedia.h>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wprotocol"
 
@@ -2137,6 +2138,25 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
                                     [self.inkAppRecordingWriter startSessionAtSourceTime:CMSampleBufferGetPresentationTimeStamp(sampleBuffer)];
                                     self.isRecordingToFile = YES;
                                     self.audioCapture.isAssetWriterRecordingToFile = YES;
+                                   
+                                }
+                              
+                            }
+                           
+                            if (self.inkAppVideoInput.isReadyForMoreMediaData && self.isRecordingToFile == YES) {
+                                [self.inkAppVideoInput appendSampleBuffer:sampleBuffer];
+                            }
+                            
+                        
+                        }
+                        
+                        if (bufferType == RPSampleBufferTypeAudioApp) {
+                            if (self.isRecordingToFile == YES) {
+                                if (self.audioSink.alreadySetTimestamps == NO) {
+                                    self.audioSink.alreadySetTimestamps = YES;
+                                    self.audioSink.externalPresentationTimestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+                                    self.audioSink.externalDecodeTimestamp = CMSampleBufferGetDecodeTimeStamp(sampleBuffer);
+                                    self.audioSink.currentBufferIteration = 0;
                                     __weak typeof(self) weakSelf = self;
                                     self.audioSink.bufferCallback = ^(CMSampleBufferRef buffer){
                                         __strong typeof(self) strongSelf = weakSelf;
@@ -2146,25 +2166,16 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
                                             }
                                         }
                                     };
-                                }
-                              
-                            }
-                           
-                            if (self.inkAppVideoInput.isReadyForMoreMediaData && self.isRecordingToFile == YES) {
-                                if (self.audioSink.alreadySetTimestamps == NO) {
-                                    self.audioSink.alreadySetTimestamps = YES;
+                                } else {
                                     self.audioSink.externalPresentationTimestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
                                     self.audioSink.externalDecodeTimestamp = CMSampleBufferGetDecodeTimeStamp(sampleBuffer);
-                                    self.audioSink.currentBufferIteration = 0;
-                                } else {
-                                    self.audioSink.currentBufferIteration++;
-                                    CMTime time = CMTimeMakeWithSeconds(3800 * 0.000001 * self.audioSink.currentBufferIteration, 1000);
-                                    self.audioSink.externalPresentationTimestamp = CMTimeAdd(CMSampleBufferGetPresentationTimeStamp(sampleBuffer), time);
-                                    self.audioSink.externalDecodeTimestamp = CMTimeAdd(CMSampleBufferGetDecodeTimeStamp(sampleBuffer), time);
+                                    //self.audioSink.currentBufferIteration++;
+                                    //CMTime time = CMTimeMakeWithSeconds(3800 * 0.000001 * self.audioSink.currentBufferIteration, 1000);
+                                    //self.audioSink.externalPresentationTimestamp = CMTimeAdd(CMSampleBufferGetPresentationTimeStamp(sampleBuffer), time);
+                                    //self.audioSink.externalDecodeTimestamp = CMTimeAdd(CMSampleBufferGetDecodeTimeStamp(sampleBuffer), time);
                                 }
-                                [self.inkAppVideoInput appendSampleBuffer:sampleBuffer];
+
                             }
-                        
                         }
                     }
                 }
