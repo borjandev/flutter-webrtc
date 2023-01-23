@@ -2089,13 +2089,13 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
         self.inkAppVideoInput.expectsMediaDataInRealTime = YES;
         [self.inkAppRecordingWriter addInput:self.inkAppVideoInput];
         self.audioCapture = [[InkAudioRecorder alloc] initWithInkAppRecordingWriter:self.inkAppRecordingWriter];
-       
+        // Create a CMTime for 16 milliseconds
+        
         if (@available(iOS 11.0, *)) {
             
             [self.replayKitRecorder startCaptureWithHandler:^(CMSampleBufferRef  _Nonnull sampleBuffer, RPSampleBufferType bufferType, NSError * _Nullable error) {
                 if (self.shouldSkipFrame == NO) {
                     if (CMSampleBufferDataIsReady(sampleBuffer)) {
-                      
                         dispatch_async(dispatch_get_main_queue(), ^{
                             if (self.inkAppRecordingWriter.status == AVAssetWriterStatusUnknown) {
                                 // Set the audio session once
@@ -2120,17 +2120,7 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
                                 self->inkAppAudioInput.expectsMediaDataInRealTime = true;
                                 [self.inkAppRecordingWriter addInput:self.inkAppAudioInput];
                                 [self.audioCapture startRecording];
-                                __weak typeof(self) weakSelf = self;
-                                self.audioSink.firstAudioSampleTime = CMTimeMake(1,1);
-                                self.audioSink.referenceSampleTime = CMTimeMake(1,1);
-                                self.audioSink.bufferCallback = ^(CMSampleBufferRef buffer){
-                                    __strong typeof(self) strongSelf = weakSelf;
-                                    if (strongSelf.isRecordingToFile == YES) {
-                                        if (strongSelf->inkAppAudioInput.readyForMoreMediaData) {
-                                            ([strongSelf->inkAppAudioInput appendSampleBuffer:buffer]);
-                                        }
-                                    }
-                                    };
+                                self->audioSink.alreadySetTimestamps = NO;
                                 if (![self.inkAppRecordingWriter startWriting]) {
                                     return;
                                 }
@@ -2147,11 +2137,31 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
                                     [self.inkAppRecordingWriter startSessionAtSourceTime:CMSampleBufferGetPresentationTimeStamp(sampleBuffer)];
                                     self.isRecordingToFile = YES;
                                     self.audioCapture.isAssetWriterRecordingToFile = YES;
-                                    NSLog(@"YES");
+                                    __weak typeof(self) weakSelf = self;
+                                    self.audioSink.bufferCallback = ^(CMSampleBufferRef buffer){
+                                        __strong typeof(self) strongSelf = weakSelf;
+                                        if (strongSelf.isRecordingToFile == YES) {
+                                            if (strongSelf->inkAppAudioInput.readyForMoreMediaData) {
+                                                ([strongSelf->inkAppAudioInput appendSampleBuffer:buffer]);
+                                            }
+                                        }
+                                    };
                                 }
                               
                             }
+                           
                             if (self.inkAppVideoInput.isReadyForMoreMediaData && self.isRecordingToFile == YES) {
+                                if (self.audioSink.alreadySetTimestamps == NO) {
+                                    self.audioSink.alreadySetTimestamps = YES;
+                                    self.audioSink.externalPresentationTimestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+                                    self.audioSink.externalDecodeTimestamp = CMSampleBufferGetDecodeTimeStamp(sampleBuffer);
+                                    self.audioSink.currentBufferIteration = 0;
+                                } else {
+                                    self.audioSink.currentBufferIteration++;
+                                    CMTime time = CMTimeMakeWithSeconds(3800 * 0.000001 * self.audioSink.currentBufferIteration, 1000);
+                                    self.audioSink.externalPresentationTimestamp = CMTimeAdd(CMSampleBufferGetPresentationTimeStamp(sampleBuffer), time);
+                                    self.audioSink.externalDecodeTimestamp = CMTimeAdd(CMSampleBufferGetDecodeTimeStamp(sampleBuffer), time);
+                                }
                                 [self.inkAppVideoInput appendSampleBuffer:sampleBuffer];
                             }
                         
