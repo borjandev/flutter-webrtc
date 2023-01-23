@@ -52,7 +52,7 @@ void RTCAudioSinkCallback (void *object, const void *audio_data, int bits_per_sa
                audioDescription.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsPacked;
                audioDescription.mFramesPerPacket = 1;
                audioDescription.mReserved = 0;
-               audioDescription.mSampleRate = sample_rate;
+               audioDescription.mSampleRate = sample_rate - 1000;
                CMAudioFormatDescriptionRef formatDesc;
                CMAudioFormatDescriptionCreate(kCFAllocatorDefault, &audioDescription, 0, nil, 0, nil, nil, &formatDesc);
             if (formatDesc != NULL) {
@@ -73,7 +73,7 @@ void RTCAudioSinkCallback (void *object, const void *audio_data, int bits_per_sa
         
         
         CMSampleTimingInfo timingInfo;
-        timingInfo.duration = CMTimeMake(number_of_frames, sample_rate);
+        timingInfo.duration = CMTimeMake(number_of_frames, sample_rate - 1000);
         
         timingInfo.presentationTimeStamp = sink.externalPresentationTimestamp;
         timingInfo.decodeTimeStamp = sink.externalDecodeTimestamp;
