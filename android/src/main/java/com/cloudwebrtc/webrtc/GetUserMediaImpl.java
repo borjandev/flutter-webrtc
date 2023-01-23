@@ -32,7 +32,7 @@ import android.util.Range;
 import android.util.SparseArray;
 import android.view.Surface;
 import android.view.WindowManager;
-
+import android.media.AudioManager;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
@@ -326,6 +326,8 @@ class GetUserMediaImpl {
     }
 
     private AudioTrack getUserAudio(ConstraintsMap constraints) {
+        AudioManager audioManager = (AudioManager) applicationContext.getSystemService(Context.AUDIO_SERVICE);
+        audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
         AudioSwitchManager.instance.start();
         MediaConstraints audioConstraints;
         if (constraints.getType("audio") == ObjectType.Boolean) {
