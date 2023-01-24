@@ -2216,11 +2216,11 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
         AudioStreamBasicDescription asbd;
         asbd.mSampleRate = 48000.0;
         asbd.mFormatID = kAudioFormatLinearPCM;
-        asbd.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
+        asbd.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
         asbd.mBytesPerPacket = 8;
         asbd.mFramesPerPacket = 1;
         asbd.mBytesPerFrame = 8;
-        asbd.mChannelsPerFrame = 4;
+        asbd.mChannelsPerFrame = 2;
         asbd.mBitsPerChannel = 16;
 
         AudioChannelLayout channelLayout;
