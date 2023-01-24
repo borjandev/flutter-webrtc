@@ -2224,7 +2224,7 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
         asbd.mBitsPerChannel = 16;
 
         AudioChannelLayout channelLayout;
-        channelLayout.mChannelLayoutTag = kAudioChannelLayoutTag_Mono;
+        channelLayout.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo;
 
         CMFormatDescriptionRef formatDescription;
         CMAudioFormatDescriptionCreate(kCFAllocatorDefault, &asbd, sizeof(channelLayout), &channelLayout, 0, NULL, NULL, &formatDescription);
