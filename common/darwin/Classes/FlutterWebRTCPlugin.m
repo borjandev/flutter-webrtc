@@ -1157,6 +1157,8 @@ InkAppRecorder *inkAppRecorder;
         startAudioSessionIfNotStarted();
         inkAppRecorder.appRecorder.isRecordingVideoToFile = NO;
         inkAppRecorder.appRecorder.isRecordingAudioToFile = NO;
+        inkAppRecorder.appRecorder.hasAudioWriterStartedWriting = NO;
+        inkAppRecorder.appRecorder.hasVideoWriterStartedWriting = NO;
             if ([call.arguments isKindOfClass:[NSString class]]) {
                 NSString *fileName = (NSString *)call.arguments;
             
@@ -1171,6 +1173,8 @@ InkAppRecorder *inkAppRecorder;
         startAudioSessionIfNotStarted();
         inkAppRecorder.appRecorder.isRecordingVideoToFile = NO;
         inkAppRecorder.appRecorder.isRecordingAudioToFile = NO;
+        inkAppRecorder.appRecorder.hasAudioWriterStartedWriting = NO;
+        inkAppRecorder.appRecorder.hasVideoWriterStartedWriting = NO;
         NSString *audioTrackID = (NSString *)call.arguments;
         RTCMediaStreamTrack *audioTrack = [self trackForId:audioTrackID];
         FlutterRTCAudioSink* _audioSink = [[FlutterRTCAudioSink alloc] initWithAudioTrack:(RTCAudioTrack *)audioTrack];
@@ -1180,6 +1184,8 @@ InkAppRecorder *inkAppRecorder;
     } else if ([@"stop" isEqualToString:call.method]){
         inkAppRecorder.appRecorder.isRecordingVideoToFile = NO;
         inkAppRecorder.appRecorder.isRecordingAudioToFile = NO;
+        inkAppRecorder.appRecorder.hasAudioWriterStartedWriting = NO;
+        inkAppRecorder.appRecorder.hasVideoWriterStartedWriting = NO;
         inkAppRecorder.appRecorder.shouldSkipFrame = YES;
         [inkAppRecorder.appRecorder stopRecordingWithHandler:^(NSError * _Nullable error) {
             if (self->inkAppRecorder.done) {
