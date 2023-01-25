@@ -28,15 +28,13 @@
 
 @end
 
-@interface InkAudioRecorder : NSObject
+@interface InkAudioRecorder : NSObject <AVAudioRecorderDelegate>
 
-@property (nonatomic, strong) AVAssetWriter * _Nonnull inkAppRecordingWriter;
-@property (nonatomic, strong) AVAssetWriterInput * _Nonnull localMicrophoneAudioInput;
-@property (nonatomic, strong) AVCaptureSession * _Nonnull localMicrophoneCaptureSession;
-@property (nonatomic, assign) BOOL isAudioWriterRecordingToFile;
-@property (nonatomic, assign) BOOL hasInitialisedWriter;
+@property (nonatomic, strong) AVAudioRecorder * _Nullable audioRecorder;
+@property (nonatomic, strong) NSURL * _Nonnull filename;
+@property (nonatomic, strong) NSDictionary * _Nullable settings;
 
-- (instancetype _Nonnull )initWithInkAppRecordingWriter:(AVAssetWriter *_Nonnull)inkAppRecordingWriter;
+- (instancetype _Nonnull )initWithURL:(NSURL *_Nonnull)url;
 - (void)startRecording;
 - (void)stopRecording;
 
@@ -47,13 +45,19 @@
 @property (nonatomic, strong) AVAssetWriter * _Nullable inkAppVideoRecordingWriter;
 @property (nonatomic, strong) AVAssetWriter * _Nullable inkAppAudioRecordingWriter;
 @property (nonatomic, strong) AVAssetWriterInput * _Nonnull inkAppVideoInput;
+
+@property (nonatomic, assign) BOOL hasVideoWriterStartedWriting;
+@property (nonatomic, assign) BOOL hasAudioWriterStartedWriting;
+
 @property (nonatomic, assign) BOOL isRecordingVideoToFile;
 @property (nonatomic, assign) BOOL isRecordingAudioToFile;
 @property (nonatomic, assign) BOOL shouldSkipFrame;
 @property (nonatomic, strong) AVAssetWriterInput * _Nonnull inkAppAudioInput;
 @property (nonatomic, strong) NSURL * _Nullable inkAppRecordingFileURL;
 @property (nonatomic, strong) NSURL * _Nullable inkAppVideoRecordingFileURL;
-@property (nonatomic, strong) NSURL * _Nullable inkAppAudioRecordingFileURL;
+@property (nonatomic, strong) NSURL * _Nullable inkAppRemoteAudioRecordingFileURL;
+@property (nonatomic, strong) NSURL * _Nullable inkAppLocalAudioRecordingFileURL;
+@property (nonatomic, strong) NSURL * _Nullable inkAppSPECIALocalAudioRecordingFileURL;
 @property (nonatomic, strong) RPScreenRecorder * _Nullable replayKitRecorder;
 @property (nonatomic, strong) InkAudioRecorder * _Nullable audioCapture;
 @property (nonatomic, strong) FlutterRTCAudioSink * _Nullable audioSink;
