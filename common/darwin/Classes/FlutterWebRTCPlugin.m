@@ -2045,7 +2045,10 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
     if (@available(iOS 11.0, *)) {
         self.isRecordingVideoToFile = NO;
         self.isRecordingAudioToFile = NO;
-        [self.audioSink close];
+        if (self.audioSink != nil) {
+            self.audioSink.bufferCallback = nil;
+            [self.audioSink close];
+        }
         if (self.inkAppVideoInput != nil && self.inkAppVideoInput.isReadyForMoreMediaData) {
             [self.inkAppVideoInput markAsFinished];
         }
