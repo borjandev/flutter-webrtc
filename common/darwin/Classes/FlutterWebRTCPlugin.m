@@ -2046,33 +2046,43 @@ NSError * _Nullable startAudioSessionIfNotStarted(void) {
         self.isRecordingVideoToFile = NO;
         self.isRecordingAudioToFile = NO;
         [self.audioSink close];
-        [self.inkAppVideoInput markAsFinished];
-        [self.inkAppAudioInput markAsFinished];
-        [self.audioCapture stopRecording];
+        if (self.inkAppVideoInput != nil && self.inkAppVideoInput.isReadyForMoreMediaData) {
+            [self.inkAppVideoInput markAsFinished];
+        }
+        if (self.inkAppAudioInput != nil && self.inkAppAudioInput.isReadyForMoreMediaData) {
+            [self.inkAppAudioInput markAsFinished];
+        }
+        if (self.audioCapture != nil) {
+            [self.audioCapture stopRecording];
+        }
         
-
-        [self.inkAppAudioRecordingWriter finishWritingWithCompletionHandler:^{
-            self.isRecordingAudioToFile = NO;
-        }];
-        [self.replayKitRecorder stopCaptureWithHandler:^(NSError * _Nullable error) {
-            handler(error);
-            if (!error) {
-                __block BOOL isFinishedWriting = NO;
-                [self.inkAppVideoRecordingWriter finishWritingWithCompletionHandler:^{
-                    self.isRecordingVideoToFile = NO;
-                    
-                    [self combineAudioTracksIntoSingleStereoTrack];
-                    isFinishedWriting = YES;
-                }];
-                
-                while (!isFinishedWriting) {
-                    [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+        if (self.inkAppAudioRecordingWriter.status == AVAssetWriterStatusWriting) {
+            [self.inkAppAudioRecordingWriter finishWritingWithCompletionHandler:^{
+                self.isRecordingAudioToFile = NO;
+            }];
+        }
+        if (self.replayKitRecorder != nil && [self.replayKitRecorder isRecording]) {
+            [self.replayKitRecorder stopCaptureWithHandler:^(NSError * _Nullable error) {
+                if (handler != nil) {
+                    handler(error);
                 }
-            } else {
-                NSLog(@"%@",error ? error : @"Unknown error");
-            }
-        }];
-    }
+                if (!error) {
+                    __block BOOL isFinishedWriting = NO;
+                    if (self.inkAppVideoRecordingWriter.status == AVAssetWriterStatusWriting) {
+                        [self.inkAppVideoRecordingWriter finishWritingWithCompletionHandler:^{
+                            self.isRecordingVideoToFile = NO;
+                            [self combineAudioTracksIntoSingleStereoTrack];
+                            isFinishedWriting = YES;
+                        }];
+                    }
+                    while (!isFinishedWriting) {
+                        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+                    }
+                } else {
+                    NSLog(@"%@",error ? error : @"Unknown error");
+                }
+            }];
+        }}
 }
 
 -(void)combineAudioTracksIntoSingleStereoTrack {
