@@ -83,15 +83,15 @@
 
   } else {
     [session setMode:config.mode error:&error];
-    BOOL success = [session setCategory:config.category
+    BOOL success = [session setCategory:AVAudioSessionCategoryPlayAndRecord
                             withOptions:AVAudioSessionCategoryOptionDefaultToSpeaker |
                                         AVAudioSessionCategoryOptionAllowAirPlay |
                                         AVAudioSessionCategoryOptionAllowBluetoothA2DP |
                                         AVAudioSessionCategoryOptionAllowBluetooth
                                   error:&error];
 
-    success = [session overrideOutputAudioPort:kAudioSessionOverrideAudioRoute_Speaker
-                                         error:&error];
+    //success = [session overrideOutputAudioPort:kAudioSessionOverrideAudioRoute_Speaker
+    //                                     error:&error];
     if (!success)
       NSLog(@"Port override failed due to: %@", error);
 
@@ -99,7 +99,7 @@
     if (!success)
       NSLog(@"Audio session override failed: %@", error);
     else
-      NSLog(@"AudioSession override via Loudspeaker is successful ");
+      NSLog(@"AudioSession override via PlayAndRecord is successfull ");
   }
   [session unlockForConfiguration];
 }

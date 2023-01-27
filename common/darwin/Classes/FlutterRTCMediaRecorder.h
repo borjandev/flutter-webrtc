@@ -48,10 +48,15 @@
 
 @property (nonatomic, assign) BOOL hasVideoWriterStartedWriting;
 @property (nonatomic, assign) BOOL hasAudioWriterStartedWriting;
+@property (nonatomic, assign) BOOL hasSinkBeenAttached;
+
+@property (nonatomic, assign) BOOL hasVideoWriterSession;
+@property (nonatomic, assign) BOOL hasAudioWriterSession;
 
 @property (nonatomic, assign) BOOL isRecordingVideoToFile;
 @property (nonatomic, assign) BOOL isRecordingAudioToFile;
-@property (nonatomic, assign) BOOL shouldSkipFrame;
+@property (nonatomic, assign) BOOL isRecordingFomSink;
+
 @property (nonatomic, strong) AVAssetWriterInput * _Nonnull inkAppAudioInput;
 @property (nonatomic, strong) NSURL * _Nullable inkAppRecordingFileURL;
 @property (nonatomic, strong) NSURL * _Nullable inkAppVideoRecordingFileURL;
@@ -76,7 +81,6 @@
 
 - (instancetype _Nonnull )init;
 - (void)startWithFileName:(NSString *_Nonnull)fileName recordingHandler:(void (^_Nonnull)(NSError * _Nullable))recordingHandler onCompletion:(void (^_Nonnull)(NSError * _Nullable))onCompletion;
-- (void)resume;
 
 @end
 
