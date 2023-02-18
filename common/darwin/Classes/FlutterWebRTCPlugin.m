@@ -1237,6 +1237,132 @@ InkAppRecorder *inkAppRecorder;
     } else {
         result(FlutterMethodNotImplemented);
     }
+    RTCRtpSender* sender = [self getRtpSenderById:peerConnection Id:senderId];
+    if (sender == nil) {
+      result([FlutterError errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                                 message:[NSString stringWithFormat:@"Error: sender not found!"]
+                                 details:nil]);
+      return;
+    }
+    RTCMediaStreamTrack* track = nil;
+    if ([trackId length] > 0) {
+      track = [self trackForId:trackId];
+      if (track == nil) {
+        result([FlutterError errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                                   message:[NSString stringWithFormat:@"Error: track not found!"]
+                                   details:nil]);
+        return;
+      }
+    }
+    [sender setTrack:track];
+    result(nil);
+  } else if ([@"rtpSenderSetTrack" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSString* peerConnectionId = argsMap[@"peerConnectionId"];
+    NSString* senderId = argsMap[@"rtpSenderId"];
+    NSString* trackId = argsMap[@"trackId"];
+    RTCPeerConnection* peerConnection = self.peerConnections[peerConnectionId];
+    if (peerConnection == nil) {
+      result([FlutterError
+          errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                message:[NSString stringWithFormat:@"Error: peerConnection not found!"]
+                details:nil]);
+      return;
+    }
+    RTCRtpSender* sender = [self getRtpSenderById:peerConnection Id:senderId];
+    if (sender == nil) {
+      result([FlutterError errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                                 message:[NSString stringWithFormat:@"Error: sender not found!"]
+                                 details:nil]);
+      return;
+    }
+    RTCMediaStreamTrack* track = nil;
+    if ([trackId length] > 0) {
+      track = [self trackForId:trackId];
+      if (track == nil) {
+        result([FlutterError errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                                   message:[NSString stringWithFormat:@"Error: track not found!"]
+                                   details:nil]);
+        return;
+      }
+    }
+    [sender setTrack:track];
+    result(nil);
+  } else if ([@"getSenders" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSString* peerConnectionId = argsMap[@"peerConnectionId"];
+    RTCPeerConnection* peerConnection = self.peerConnections[peerConnectionId];
+    if (peerConnection == nil) {
+      result([FlutterError
+          errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                message:[NSString stringWithFormat:@"Error: peerConnection not found!"]
+                details:nil]);
+      return;
+    }
+
+    NSMutableArray* senders = [NSMutableArray array];
+    for (RTCRtpSender* sender in peerConnection.senders) {
+      [senders addObject:[self rtpSenderToMap:sender]];
+    }
+
+    result(@{@"senders" : senders});
+  } else if ([@"getReceivers" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSString* peerConnectionId = argsMap[@"peerConnectionId"];
+    RTCPeerConnection* peerConnection = self.peerConnections[peerConnectionId];
+    if (peerConnection == nil) {
+      result([FlutterError
+          errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                message:[NSString stringWithFormat:@"Error: peerConnection not found!"]
+                details:nil]);
+      return;
+    }
+
+    NSMutableArray* receivers = [NSMutableArray array];
+    for (RTCRtpReceiver* receiver in peerConnection.receivers) {
+      [receivers addObject:[self receiverToMap:receiver]];
+    }
+
+    result(@{@"receivers" : receivers});
+  } else if ([@"getTransceivers" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSString* peerConnectionId = argsMap[@"peerConnectionId"];
+    RTCPeerConnection* peerConnection = self.peerConnections[peerConnectionId];
+    if (peerConnection == nil) {
+      result([FlutterError
+          errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                message:[NSString stringWithFormat:@"Error: peerConnection not found!"]
+                details:nil]);
+      return;
+    }
+
+    NSMutableArray* transceivers = [NSMutableArray array];
+    for (RTCRtpTransceiver* transceiver in peerConnection.transceivers) {
+      [transceivers addObject:[self transceiverToMap:transceiver]];
+    }
+
+    result(@{@"transceivers" : transceivers});
+  } else if ([@"getDesktopSources" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    [self getDesktopSources:argsMap result:result];
+  } else if ([@"updateDesktopSources" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    [self updateDesktopSources:argsMap result:result];
+  } else if ([@"getDesktopSourceThumbnail" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    [self getDesktopSourceThumbnail:argsMap result:result];
+  } else if ([@"setCodecPreferences" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    [self transceiverSetCodecPreferences:argsMap result:result];
+  }  else if ([@"getRtpReceiverCapabilities" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    [self peerConnectionGetRtpReceiverCapabilities:argsMap result:result];
+  } else if ([@"getRtpSenderCapabilities" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    [self peerConnectionGetRtpSenderCapabilities:argsMap result:result];
+  } else {
+    result(FlutterMethodNotImplemented);
+  }
 }
 
 - (void)dealloc {
@@ -1563,8 +1689,8 @@ InkAppRecorder *inkAppRecorder;
     BOOL srtpEnableEncryptedRtpHeaderExtensions = NO;
     BOOL srtpEnableAes128Sha1_32CryptoCipher = NO;
 
-    if (options[@"enableGcmCryptoSuites" != nil &&
-                [options[@"enableGcmCryptoSuites"] isKindOfClass:[NSNumber class]]]) {
+    if (options[@"enableGcmCryptoSuites"] != nil &&
+                [options[@"enableGcmCryptoSuites"] isKindOfClass:[NSNumber class]]) {
       NSNumber* value = options[@"enableGcmCryptoSuites"];
       srtpEnableGcmCryptoSuites = [value boolValue];
     }
